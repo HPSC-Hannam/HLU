@@ -2,45 +2,78 @@ import subprocess
 import re
 import logging
 
-def check_updates(logger):
-    logger.info("Gathering upgradable package version status...")
+import subprocess
+import re
+import logging
+import time
+from datetime import datetime
 
-    # 1) 설치된 모든 패키지와 현재 버전 목록 취득
-    dpkg = subprocess.run(
-        ['dpkg-query', '-W', '-f=${binary:Package}\\t${Version}\\n'],
-        stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True
-    )
-    if dpkg.returncode != 0:
-        logger.error("dpkg-query failed: %s", dpkg.stderr)
-        print("[!] Failed to retrieve installed package list.")
+def get_upgradable_packages(logger):
+    """업데이트 가능한 패키지 리스트 반환"""
+    result = subprocess.run(['apt', 'list', '--upgradable'], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+    if result.returncode != 0:
+        logger.error("Failed to fetch upgradable package list: %s", result.stderr)
+        return []
+
+    lines = result.stdout.strip().split('\n')
+    if len(lines) <= 1:
+        return []
+
+    packages = []
+    for line in lines[1:]:  # 첫 번째 줄은 "Listing..."
+        parts = line.split()
+        if len(parts) >= 1:
+            pkg_name = parts[0].split('/')[0]
+            packages.append(pkg_name)
+
+    return packages
+
+def check_updates(logger):
+    """업데이트 가능한 패키지 출력"""
+    logger.info("Checking for available updates...")
+    packages = get_upgradable_packages(logger)
+
+    if not packages:
+        print("[✓] All packages are up to date.")
+        logger.info("No packages to update.")
         return
 
-    installed_lines = dpkg.stdout.splitlines()
+    print(f"{'Package':30}{'Installed':20}{'Candidate'}")
+    print("-" * 70)
 
-    # 2) 헤더 출력
-    header = f"{'Package':30}{'Installed':20}{'Candidate'}"
-    print(header)
-    print('-' * len(header))
+    for pkg in packages:
+        dpkg = subprocess.run(['dpkg-query', '-W', '-f=${Version}', pkg],
+                              stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+        installed = dpkg.stdout.strip() if dpkg.returncode == 0 else 'N/A'
 
-    # 3) 각 패키지별로 apt-cache policy 실행하여 Candidate 버전 파싱
-    for line in installed_lines:
-        pkg, installed_ver = line.split('\t', 1)
-        policy = subprocess.run(
-            ['apt-cache', 'policy', pkg],
-            stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True
-        )
-        if policy.returncode != 0:
-            logger.warning("apt-cache policy failed for %s: %s", pkg, policy.stderr)
-            continue
-
+        policy = subprocess.run(['apt-cache', 'policy', pkg],
+                                stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
         m = re.search(r'Candidate:\s*(\S+)', policy.stdout)
-        candidate = m.group(1) if m and m.group(1) != '(none)' else None
+        candidate = m.group(1) if m else 'unknown'
 
-        # 4) 설치 버전과 후보 버전이 다르고 후보가 None이 아닐 때만 출력
-        if candidate and candidate != installed_ver:
-            print(f"{pkg:30}{installed_ver:20}{candidate}")
+        print(f"{pkg:30}{installed:20}{candidate}")
 
-    logger.info("Upgradable package version status displayed.")
+    logger.info(f"{len(packages)} packages can be upgraded.")
+
+def monitor_updates(logger, interval=60):
+    """1분마다 주기적으로 check 수행"""
+    logger.info("Starting background monitor loop...")
+
+    while True:
+        now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        print(f"\n[{now}] Checking for updates...")
+
+        packages = get_upgradable_packages(logger)
+        if packages:
+            print(f"[!] {len(packages)} packages can be upgraded:")
+            for pkg in packages:
+                print(f"  - {pkg}")
+            logger.info(f"{len(packages)} upgradable packages detected.")
+        else:
+            print("[✓] No updates available.")
+            logger.info("No packages to update.")
+
+        time.sleep(interval)
 
 def update_packages(logger, download_only=False, auto_confirm=False, dry_run=False):
     logger.info(f"Update started: download_only={download_only}, auto_confirm={auto_confirm}, dry_run={dry_run}")
