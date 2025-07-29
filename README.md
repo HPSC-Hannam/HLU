@@ -1,5 +1,5 @@
 # HLU
-HPSC Linux updater
+HPSC Linux Updater
 
 
 python3 hlu/main.py check
