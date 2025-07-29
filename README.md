@@ -11,3 +11,5 @@ python3 hlu/main.py update
 python3 hlu/main.py update --yes
 
 python3 hlu/main.py update --dry-run
+
+python3 hlu/main.py monitor
