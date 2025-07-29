@@ -42,40 +42,56 @@ def check_updates(logger):
 
     logger.info("Upgradable package version status displayed.")
 
-def download_updates(logger):
-    logger.info("Attempting to download upgradable packages...")
-    try:
-        result = subprocess.run(['sudo', 'apt-get', '-d', 'upgrade', '-y'], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
-        if result.returncode == 0:
-            logger.info("Package download succeeded")
-            print("[✔] Package download complete.")
+def update_packages(logger, download_only=False, auto_confirm=False, dry_run=False):
+    logger.info(f"Update started: download_only={download_only}, auto_confirm={auto_confirm}, dry_run={dry_run}")
+
+    if dry_run:
+        print("[DRY RUN] No commands will be executed.")
+        if download_only:
+            print("Command: sudo apt-get -d upgrade -y")
         else:
-            logger.error("Package download failed:\n%s", result.stderr)
-            print("[!] Download failed:\n", result.stderr)
-    except Exception as e:
-        logger.exception("Exception occurred during download: %s", str(e))
-        print("[!] Unexpected error during download.")
+            print("Command sequence:")
+            print("  sudo apt-get update")
+            print("  sudo apt-get upgrade -y")
+        logger.info("Dry run completed.")
+        return
 
-def install_updates(logger, auto_confirm=False):
-    logger.info("Preparing to install downloaded updates...")
+    if download_only:
+        logger.info("Downloading updates only...")
+        try:
+            result = subprocess.run(['sudo', 'apt-get', '-d', 'upgrade', '-y'], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+            if result.returncode == 0:
+                logger.info("Package download succeeded")
+                print("[✔] Package download complete.")
+            else:
+                logger.error("Package download failed:\n%s", result.stderr)
+                print("[!] Download failed:\n", result.stderr)
+        except Exception as e:
+            logger.exception("Exception during download: %s", str(e))
+            print("[!] Unexpected error during download.")
+        return
 
+    # Install path
     if not auto_confirm:
-        print("[!] Package installation may change your system.")
+        print("[!] Package installation will update your system.")
         confirm = input("Proceed with installation? [y/N]: ").strip().lower()
         if confirm != 'y':
             print("[i] Installation cancelled.")
             logger.info("User cancelled installation.")
             return
 
-    logger.info("Starting package installation...")
-    try:
-        result = subprocess.run(['sudo', 'apt-get', 'upgrade', '-y'], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
-        if result.returncode == 0:
-            logger.info("Package installation succeeded")
-            print("[✔] Installation complete.")
-        else:
-            logger.error("Package installation failed:\n%s", result.stderr)
-            print("[!] Installation failed:\n", result.stderr)
-    except Exception as e:
-        logger.exception("Exception during install: %s", str(e))
-        print("[!] Unexpected error during installation.")
+    logger.info("Running apt-get update...")
+    update_result = subprocess.run(['sudo', 'apt-get', 'update'], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+    if update_result.returncode != 0:
+        logger.error("apt-get update failed:\n%s", update_result.stderr)
+        print("[!] Failed to update package lists:\n", update_result.stderr)
+        return
+
+    logger.info("Running apt-get upgrade...")
+    upgrade_result = subprocess.run(['sudo', 'apt-get', 'upgrade', '-y'], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+    if upgrade_result.returncode == 0:
+        logger.info("Package installation succeeded")
+        print("[✔] Installation complete.")
+    else:
+        logger.error("Package installation failed:\n%s", upgrade_result.stderr)
+        print("[!] Installation failed:\n", upgrade_result.stderr)
