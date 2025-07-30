@@ -1,9 +1,6 @@
 import subprocess
 import re
 import logging
-import subprocess
-import re
-import logging
 import time
 from datetime import datetime
 
