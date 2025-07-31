@@ -60,7 +60,7 @@ def check_updates(logger):
     # 업그레이드 가능한 패키지 개수 로그 남김
     logger.info(f"{len(packages)} packages can be upgraded.")
 
-def monitor_updates(logger, interval=60):
+def monitor_updates(logger, interval=3600):
     """1분마다 주기적으로 check 수행"""
     logger.info("Starting background monitor loop...")
 
